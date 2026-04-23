@@ -96,15 +96,18 @@ dump_path = os.path.join(BASE_DIR, "medispan_dump.sql")
 
 with open(dump_path, "w") as f:
     result = subprocess.run(
-    [
-        "mysqldump",
-        "--no-tablespaces",
-        "-h", "127.0.0.1",     
-        "-P", "3306",
-        "-u", "root",
-        "-proot",
-        "medispan_test"
-    ],
+        [
+            "mysqldump",
+            "--no-tablespaces",
+            "-h", "127.0.0.1",
+            "-P", "3306",
+            "-u", "root",
+            "-proot",
+            "medispan_test"
+        ],
+        stdout=f,                 
+        stderr=subprocess.PIPE,   
+        text=True
     )
 
 if result.returncode != 0:
@@ -113,5 +116,3 @@ if result.returncode != 0:
     raise Exception("mysqldump failed")
 
 print("Dump saved at:", dump_path)
-
-print("\nALL DONE SUCCESSFULLY")
