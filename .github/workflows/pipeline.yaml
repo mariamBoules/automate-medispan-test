@@ -45,6 +45,7 @@ jobs:
 
       - name: Download input files
         run: |
+          rm -rf assets
           mkdir assets
           gdown "${{ github.event.inputs.zip_url }}" -O assets/input.zip
           gdown "${{ github.event.inputs.excel_url }}" -O assets/changes.xls
