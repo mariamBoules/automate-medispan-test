@@ -99,8 +99,8 @@ def get_db_value(cursor, ndc, table_name, column_name):
 def main():
     conn = mysql.connector.connect(
         host="localhost",
-        user="medispan",
-        password="mariam@",
+        user="root",
+        password="root",
         database="medispan_test"
     )
     cursor = conn.cursor(dictionary=True)
@@ -142,6 +142,7 @@ def main():
                 "expected_new_val": expected_new_val,
                 "actual_db_val": actual_db_val,
             })
+
 
     cursor.close()
     conn.close()

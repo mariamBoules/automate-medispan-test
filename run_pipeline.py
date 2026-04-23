@@ -54,8 +54,8 @@ def clean_row(row, table_columns, numeric_columns):
 # 🔌 Connect (NO database yet)
 conn = mysql.connector.connect(
     host="localhost",
-    user="medispan",
-    password="mariam@"
+    user="root",
+    password="root"
 )
 
 cursor = conn.cursor()

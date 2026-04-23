@@ -1,0 +1,52 @@
+name: Medispan Pipeline
+
+on:
+  workflow_dispatch:   
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: medispan_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Wait for MySQL
+        run: sleep 20
+
+      - name: Run pipeline
+        run: |
+          python main.py
+
+      - name: Dump DB
+        run: |
+          mysqldump --no-tablespaces -h 127.0.0.1 -uroot -proot medispan_test > medispan_dump.sql
+
+      - name: Upload SQL dump
+        uses: actions/upload-artifact@v4
+        with:
+          name: medispan-dump
+          path: medispan_dump.sql
