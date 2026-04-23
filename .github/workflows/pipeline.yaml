@@ -61,8 +61,8 @@ jobs:
 
       - name: Show download instructions
           run: |
-            echo "===================================="
+            echo "====================================="
             echo "SQL READY FOR DOWNLOAD"
             echo "Go to: Actions → This run → Artifacts"
             echo "Download: medispan-output"
-            echo "===================================="
+            echo "====================================="
