@@ -60,9 +60,9 @@ jobs:
           path: medispan_dump.sql
 
       - name: Show download instructions
-          run: |
-            echo "====================================="
-            echo "SQL READY FOR DOWNLOAD"
-            echo "Go to: Actions → This run → Artifacts"
-            echo "Download: medispan-output"
-            echo "====================================="
+        run: |
+          echo "====================================="
+          echo "SQL READY FOR DOWNLOAD"
+          echo "Go to: Actions → This run → Artifacts"
+          echo "Download: medispan-output"
+          echo "====================================="
