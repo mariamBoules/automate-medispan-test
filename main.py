@@ -108,16 +108,15 @@ dump_path = os.path.join(BASE_DIR, "medispan_dump.sql")
 
 with open(dump_path, "w") as f:
     result = subprocess.run(
-        [
-            "mysqldump",
-            "--no-tablespaces",
-            "-u", "medispan",
-            "-pmariam@",
-            "medispan_test"
-        ],
-        stdout=f,
-        stderr=subprocess.PIPE,
-        text=True
+    [
+        "mysqldump",
+        "--no-tablespaces",
+        "-h", "127.0.0.1",     # 🔥 CRITICAL FIX
+        "-P", "3306",
+        "-u", "root",
+        "-proot",
+        "medispan_test"
+    ],
     )
 
 if result.returncode != 0:

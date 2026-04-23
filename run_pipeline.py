@@ -53,7 +53,7 @@ def clean_row(row, table_columns, numeric_columns):
     return cleaned
 # 🔌 Connect (NO database yet)
 conn = mysql.connector.connect(
-    host="localhost",
+    host="127.0.0.1",
     user="root",
     password="root"
 )
