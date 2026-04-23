@@ -1,7 +1,14 @@
 name: Medispan Pipeline
 
 on:
-  workflow_dispatch:   
+  workflow_dispatch:
+    inputs:
+      zip_url:
+        description: "Google Drive ZIP link"
+        required: true
+      excel_url:
+        description: "Google Drive XLS link"
+        required: true
 
 jobs:
   run:
@@ -22,31 +29,33 @@ jobs:
           --health-retries=5
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
+          pip install gdown
 
       - name: Wait for MySQL
         run: sleep 20
 
+      - name: Download input files
+        run: |
+          mkdir assets
+          gdown "${{ github.event.inputs.zip_url }}" -O assets/input.zip
+          gdown "${{ github.event.inputs.excel_url }}" -O assets/changes.xls
+
       - name: Run pipeline
-        run: |
-          python main.py
+        run: python main.py
 
-      - name: Dump DB
-        run: |
-          mysqldump --no-tablespaces -h 127.0.0.1 -uroot -proot medispan_test > medispan_dump.sql
-
-      - name: Upload SQL dump
+      - name: Upload output
         uses: actions/upload-artifact@v4
         with:
-          name: medispan-dump
-          path: medispan_dump.sql
+          name: medispan-output
+          path: |
+            medispan_dump.sql
+            validation_errors.csv

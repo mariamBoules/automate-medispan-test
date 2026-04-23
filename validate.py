@@ -33,7 +33,7 @@ def normalize(value):
 
     value = str(value).strip()
 
-    # 🔥 treat NA as empty
+    # treat NA as empty
     if value.upper() in ["NA", "N/A"]:
         return ""
 
@@ -148,13 +148,10 @@ def main():
     conn.close()
 
     if skipped:
-        print(f"\nSkipped rows: {len(skipped)}")
         for item in skipped[:10]:
             print(item)
 
     if errors:
-        print(f"\nALIDATION FAILED — {len(errors)} mismatches\n")
-
         # convert to DataFrame
         errors_df = pd.DataFrame(errors)
 
@@ -162,12 +159,12 @@ def main():
         output_path = os.path.join(BASE_DIR, "validation_errors.csv")
         errors_df.to_csv(output_path, index=False)
 
-        print(f"📄 Errors saved to: {output_path}")
+        print(f"Errors saved to: {output_path}")
 
         raise SystemExit(1)
 
     else:
-        print("\n✅ VALIDATION PASSED")
+        print("\nVALIDATION PASSED")
 
 
 if __name__ == "__main__":

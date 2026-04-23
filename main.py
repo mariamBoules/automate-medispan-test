@@ -4,7 +4,6 @@ import zipfile
 import subprocess
 import shutil
 
-# 🔥 Use same Python interpreter
 python_executable = sys.executable
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,7 +13,6 @@ EXTRACT_DIR = os.path.join(BASE_DIR, "input_data")
 # -----------------------------------
 # STEP 0 — FIND INPUT FILES
 # -----------------------------------
-print("🔍 Searching for input files in assets/...")
 
 zip_path = None
 excel_path = None
@@ -29,17 +27,16 @@ for file in os.listdir(ASSETS_DIR):
         excel_path = file_path
 
 if not zip_path:
-    raise Exception("❌ No ZIP file found in assets/")
+    raise Exception("No ZIP file found in assets/")
 if not excel_path:
-    raise Exception("❌ No Excel (.xls) file found in assets/")
+    raise Exception("No Excel (.xls) file found in assets/")
 
-print("✅ ZIP found:", zip_path)
-print("✅ Excel found:", excel_path)
+print("ZIP found:", zip_path)
+print("Excel found:", excel_path)
 
 # -----------------------------------
 # STEP 1 — CLEAN input_data
 # -----------------------------------
-print("🧹 Cleaning input_data/...")
 
 if os.path.exists(EXTRACT_DIR):
     for item in os.listdir(EXTRACT_DIR):
@@ -55,17 +52,13 @@ else:
 # -----------------------------------
 # STEP 2 — UNZIP
 # -----------------------------------
-print("📦 Extracting ZIP...")
 
 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
     zip_ref.extractall(EXTRACT_DIR)
 
-print("✅ Extracted to:", EXTRACT_DIR)
-
 # -----------------------------------
 # STEP 3 — FIND DELIMIT FOLDER
 # -----------------------------------
-print("🔍 Searching for DELIMIT folder...")
 
 delimit_path = None
 
@@ -75,14 +68,11 @@ for root, dirs, files in os.walk(EXTRACT_DIR):
         break
 
 if not delimit_path:
-    raise Exception("❌ DELIMIT folder not found")
-
-print("✅ DELIMIT found:", delimit_path)
+    raise Exception("DELIMIT folder not found")
 
 # -----------------------------------
 # STEP 4 — RUN PIPELINE
 # -----------------------------------
-print("🚀 Running pipeline...")
 
 subprocess.run(
     [python_executable, "run_pipeline.py", delimit_path],
@@ -92,7 +82,6 @@ subprocess.run(
 # -----------------------------------
 # STEP 5 — RUN VALIDATION
 # -----------------------------------
-print("🔍 Running validation...")
 
 subprocess.run(
     [python_executable, "validate.py", excel_path],
@@ -102,7 +91,6 @@ subprocess.run(
 # -----------------------------------
 # STEP 6 — DUMP DATABASE
 # -----------------------------------
-print("💾 Dumping database...")
 
 dump_path = os.path.join(BASE_DIR, "medispan_dump.sql")
 
@@ -111,7 +99,7 @@ with open(dump_path, "w") as f:
     [
         "mysqldump",
         "--no-tablespaces",
-        "-h", "127.0.0.1",     # 🔥 CRITICAL FIX
+        "-h", "127.0.0.1",     
         "-P", "3306",
         "-u", "root",
         "-proot",
@@ -120,10 +108,10 @@ with open(dump_path, "w") as f:
     )
 
 if result.returncode != 0:
-    print("❌ Dump failed:")
+    print("Dump failed:")
     print(result.stderr)
     raise Exception("mysqldump failed")
 
-print("✅ Dump saved at:", dump_path)
+print("Dump saved at:", dump_path)
 
-print("\n🎉 ALL DONE SUCCESSFULLY")
+print("\nALL DONE SUCCESSFULLY")

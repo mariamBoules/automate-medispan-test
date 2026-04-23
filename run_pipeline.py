@@ -5,7 +5,6 @@ import sys
 
 DELIMIT_PATH = sys.argv[1]
 
-# 🔁 Mapping (your confirmed mapping)
 mapping = {
     "MF2GPPC": "mf2gppc_j",
     "MF2GPR": "mf2gpr_l",
@@ -36,7 +35,7 @@ def clean_row(row, table_columns, numeric_columns):
         for v in cleaned
     ]
 
-    # Step 3: 🔥 enforce column count (THIS replaces trailing logic)
+    # Step 3: enforce column count
     if len(cleaned) < len(table_columns):
         cleaned.extend([None] * (len(table_columns) - len(cleaned)))
 
@@ -51,7 +50,7 @@ def clean_row(row, table_columns, numeric_columns):
             cleaned[i] = None
 
     return cleaned
-# 🔌 Connect (NO database yet)
+
 conn = mysql.connector.connect(
     host="127.0.0.1",
     user="root",
@@ -60,16 +59,13 @@ conn = mysql.connector.connect(
 
 cursor = conn.cursor()
 
-# 🔥 STEP 0 — Reset DB
+# STEP 0 — Reset DB
 cursor.execute("SET FOREIGN_KEY_CHECKS = 0;")
 cursor.execute("DROP DATABASE IF EXISTS medispan_test;")
 cursor.execute("CREATE DATABASE medispan_test CHARACTER SET latin1;")
 cursor.execute("USE medispan_test;")
 
-print("✅ Database ready!")
-
-# 🔥 STEP 1 — Create schema
-print("⚙️ Creating schema...")
+# STEP 1 — Create schema
 
 with open("schema/medispan_schema.sql", "r", encoding="utf-8") as f:
     schema_sql = f.read()
@@ -80,21 +76,18 @@ for stmt in schema_sql.split(";"):
         try:
             cursor.execute(stmt)
         except Exception as e:
-            print("⚠️ Skipping statement:", e)
+            continue
 
 conn.commit()
-print("✅ Schema ready!")
 
-# 🔥 STEP 2 — Load all files
+# STEP 2 — Load all files
 for file_name, table_name in mapping.items():
 
     file_path = os.path.join(DELIMIT_PATH, file_name)
 
     if not os.path.exists(file_path):
-        print(f"⚠️ File missing: {file_name}")
+        print(f"File missing: {file_name}")
         continue
-
-    print(f"\n📥 Loading {file_name} → {table_name}")
 
     df = pd.read_csv(
         file_path,
@@ -104,7 +97,6 @@ for file_name, table_name in mapping.items():
         keep_default_na=False
     )
 
-    # 🔥 Get schema info for THIS table
     cursor.execute(f"DESCRIBE {table_name}")
     columns_info = cursor.fetchall()
 
@@ -116,13 +108,13 @@ for file_name, table_name in mapping.items():
         if any(t in col[1].lower() for t in ["int", "decimal", "float", "double", "bigint"])
     }
 
-    # 🔥 Clean data correctly
+    # Clean data correctly
     data = [
         clean_row(row, table_columns, numeric_columns)
         for row in df.values.tolist()
     ]
 
-    # 🔧 Build insert query
+    # Build insert query
     placeholders = ", ".join(["%s"] * len(df.columns))
     insert_sql = f"INSERT INTO {table_name} VALUES ({placeholders})"
 
@@ -132,9 +124,6 @@ for file_name, table_name in mapping.items():
         batch = data[i:i + batch_size]
         cursor.executemany(insert_sql, batch)
         conn.commit()
-        print(f"✔ {table_name}: {i} → {i + len(batch)}")
-
-print("\n🎉 ALL FILES LOADED SUCCESSFULLY!")
 
 cursor.close()
 conn.close()

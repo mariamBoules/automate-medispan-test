@@ -9,5 +9,3 @@ os.makedirs(output_dir, exist_ok=True)
 
 with zipfile.ZipFile(zip_path, 'r') as zip_ref:
     zip_ref.extractall(output_dir)
-
-print("Unzipped to:", output_dir)
