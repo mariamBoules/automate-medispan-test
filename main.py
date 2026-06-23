@@ -107,6 +107,7 @@ subprocess.run(
     [python_executable, "run_pipeline.py", delimit_path],
     check=True,
     cwd=BASE_DIR,
+    env=os.environ.copy(),
 )
 
 # -----------------------------------
@@ -117,6 +118,7 @@ subprocess.run(
     [python_executable, "validate.py", excel_path],
     check=True,
     cwd=BASE_DIR,
+    env=os.environ.copy(),
 )
 
 # -----------------------------------
@@ -157,6 +159,7 @@ if os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID") and has_upload_credentials():
         [python_executable, "upload_to_drive.py", dump_path],
         check=True,
         cwd=BASE_DIR,
+        env=os.environ.copy(),
     )
 elif os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID"):
     print(
