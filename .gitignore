@@ -4,3 +4,10 @@ venv/
 gdrive-credentials.json
 oauth-client.json
 google-oauth-token.json
+__pycache__/
+*.pyc
+medispan_dump.sql
+validation_errors.csv
+input_data/
+assets/*.zip
+assets/*.xls

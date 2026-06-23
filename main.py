@@ -1,5 +1,4 @@
 import os
-import sys
 import zipfile
 import subprocess
 import shutil
@@ -7,9 +6,9 @@ import shutil
 import env_loader  # noqa: F401 — loads .env before reading variables
 
 from db_config import MYSQL_DATABASE, MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
-from drive_utils import download_inputs_from_drive, has_drive_credentials, has_upload_credentials
-
-python_executable = sys.executable
+from drive_utils import download_inputs_from_drive, has_drive_credentials, has_upload_credentials, upload_sql_to_drive
+from run_pipeline import run as run_pipeline
+from validate import main as run_validation
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
@@ -103,23 +102,13 @@ if not delimit_path:
 # STEP 4 — RUN PIPELINE
 # -----------------------------------
 
-subprocess.run(
-    [python_executable, "run_pipeline.py", delimit_path],
-    check=True,
-    cwd=BASE_DIR,
-    env=os.environ.copy(),
-)
+run_pipeline(delimit_path)
 
 # -----------------------------------
 # STEP 5 — RUN VALIDATION
 # -----------------------------------
 
-subprocess.run(
-    [python_executable, "validate.py", excel_path],
-    check=True,
-    cwd=BASE_DIR,
-    env=os.environ.copy(),
-)
+run_validation(excel_path)
 
 # -----------------------------------
 # STEP 6 — DUMP DATABASE
@@ -155,12 +144,7 @@ print("Dump saved at:", dump_path)
 # -----------------------------------
 
 if os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID") and has_upload_credentials():
-    subprocess.run(
-        [python_executable, "upload_to_drive.py", dump_path],
-        check=True,
-        cwd=BASE_DIR,
-        env=os.environ.copy(),
-    )
+    upload_sql_to_drive(dump_path)
 elif os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID"):
     print(
         "\nSQL dump saved locally, but Drive upload was skipped.\n"

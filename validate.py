@@ -6,8 +6,6 @@ from db_config import MYSQL_DATABASE, connect
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-EXCEL_PATH = sys.argv[1]
-
 
 # CHANGE TYPE in Excel -> (table, column)
 CHANGE_TYPE_TO_DB = {
@@ -97,11 +95,11 @@ def get_db_value(cursor, ndc, table_name, column_name):
     raise ValueError(f"Unsupported table: {table_name}")
 
 
-def main():
+def main(excel_path):
     conn = connect(database=MYSQL_DATABASE)
     cursor = conn.cursor(dictionary=True)
 
-    df = pd.read_excel(EXCEL_PATH, engine="xlrd")
+    df = pd.read_excel(excel_path, engine="xlrd")
 
     # Adjust these if the actual sheet uses slightly different names
     NDC_COL = "NDC"
@@ -164,4 +162,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv[1])
