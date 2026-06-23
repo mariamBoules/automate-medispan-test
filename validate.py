@@ -1,7 +1,8 @@
 import os
 import pandas as pd
-import mysql.connector
 import sys
+
+from db_config import MYSQL_DATABASE, connect
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -97,12 +98,7 @@ def get_db_value(cursor, ndc, table_name, column_name):
 
 
 def main():
-    conn = mysql.connector.connect(
-        host="127.0.0.1",
-        user="root",
-        password="root",
-        database="medispan_test"
-    )
+    conn = connect(database=MYSQL_DATABASE)
     cursor = conn.cursor(dictionary=True)
 
     df = pd.read_excel(EXCEL_PATH, engine="xlrd")

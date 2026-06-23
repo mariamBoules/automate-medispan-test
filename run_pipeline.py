@@ -1,9 +1,12 @@
 import os
 import pandas as pd
-import mysql.connector
 import sys
 
+from db_config import connect
+
 DELIMIT_PATH = sys.argv[1]
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SCHEMA_PATH = os.path.join(BASE_DIR, "schema", "medispan_schema.sql")
 
 mapping = {
     "MF2GPPC": "mf2gppc_j",
@@ -51,11 +54,7 @@ def clean_row(row, table_columns, numeric_columns):
 
     return cleaned
 
-conn = mysql.connector.connect(
-    host="127.0.0.1",
-    user="root",
-    password="root"
-)
+conn = connect()
 
 cursor = conn.cursor()
 
@@ -67,7 +66,13 @@ cursor.execute("USE medispan_test;")
 
 # STEP 1 — Create schema
 
-with open("schema/medispan_schema.sql", "r", encoding="utf-8") as f:
+if not os.path.exists(SCHEMA_PATH):
+    raise FileNotFoundError(
+        f"Missing schema file: {SCHEMA_PATH}\n"
+        "Restore it with: git restore schema/medispan_schema.sql"
+    )
+
+with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
     schema_sql = f.read()
 
 for stmt in schema_sql.split(";"):

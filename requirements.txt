@@ -1,3 +1,7 @@
 pandas
 mysql-connector-python
 xlrd
+google-api-python-client
+google-auth
+google-auth-oauthlib
+python-dotenv

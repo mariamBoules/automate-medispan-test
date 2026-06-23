@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<product>
+  <productName>med-file2</productName>
+  <productDescription><![CDATA[MEDI-SPAN ELECTRONIC DRUG FILE (MED-FILE) V2]]></productDescription>
+  <zipFileName>med-file2_0_0_mo_pdu-delimt_pricing_d_20260603.zip</zipFileName>
+  <countryCode>0</countryCode>
+  <countryDescription>USA</countryDescription>
+  <languageCode>0</languageCode>
+  <languageDescription>ENGLISH</languageDescription>
+  <frequencyCode>mo</frequencyCode>
+  <frequencyName>Monthly</frequencyName>
+  <layout>pdu-delimt</layout>
+  <version>PRICING</version>
+  <fileTypeCode>d</fileTypeCode>
+  <fileTypeName>DB</fileTypeName>
+  <issueDate>20260603</issueDate>
+</product>

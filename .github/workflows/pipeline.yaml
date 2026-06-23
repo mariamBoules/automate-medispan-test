@@ -3,12 +3,12 @@ name: Medispan Pipeline
 on:
   workflow_dispatch:
     inputs:
-      zip_url:
-        description: "Google Drive ZIP link"
-        required: true
-      excel_url:
-        description: "Google Drive XLS link"
-        required: true
+      year:
+        description: "Year folder (default: current year)"
+        required: false
+      month:
+        description: "Month folder 1-12 (default: current month)"
+        required: false
 
 jobs:
   run:
@@ -36,21 +36,27 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          pip install gdown
+        run: pip install -r requirements.txt
 
       - name: Wait for MySQL
         run: sleep 20
 
-      - name: Download input files
-        run: |
-          rm -rf assets
-          mkdir assets
-          gdown "${{ github.event.inputs.zip_url }}" -O assets/input.zip
-          gdown "${{ github.event.inputs.excel_url }}" -O assets/changes.xls
-
       - name: Run pipeline
+        env:
+          MYSQL_HOST: 127.0.0.1
+          MYSQL_PORT: 3306
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: medispan_test
+          GDRIVE_SERVICE_ACCOUNT_JSON: ${{ secrets.GDRIVE_SERVICE_ACCOUNT_JSON }}
+          GDRIVE_ZIP_ROOT_FOLDER_ID: ${{ secrets.GDRIVE_ZIP_ROOT_FOLDER_ID }}
+          GDRIVE_XLS_ROOT_FOLDER_ID: ${{ secrets.GDRIVE_XLS_ROOT_FOLDER_ID }}
+          GDRIVE_SQL_ROOT_FOLDER_ID: ${{ secrets.GDRIVE_SQL_ROOT_FOLDER_ID }}
+          GOOGLE_OAUTH_CLIENT_ID: ${{ secrets.GOOGLE_OAUTH_CLIENT_ID }}
+          GOOGLE_OAUTH_CLIENT_SECRET: ${{ secrets.GOOGLE_OAUTH_CLIENT_SECRET }}
+          GOOGLE_OAUTH_REFRESH_TOKEN: ${{ secrets.GOOGLE_OAUTH_REFRESH_TOKEN }}
+          PIPELINE_YEAR: ${{ github.event.inputs.year }}
+          PIPELINE_MONTH: ${{ github.event.inputs.month }}
         run: python main.py
 
       - name: Upload SQL output
@@ -58,11 +64,3 @@ jobs:
         with:
           name: medispan-output
           path: medispan_dump.sql
-
-      - name: Show download instructions
-        run: |
-          echo "====================================="
-          echo "SQL READY FOR DOWNLOAD"
-          echo "Go to: Actions → This run → Artifacts"
-          echo "Download: medispan-output"
-          echo "====================================="

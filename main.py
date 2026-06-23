@@ -4,6 +4,11 @@ import zipfile
 import subprocess
 import shutil
 
+import env_loader  # noqa: F401 — loads .env before reading variables
+
+from db_config import MYSQL_DATABASE, MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
+from drive_utils import download_inputs_from_drive, has_drive_credentials, has_upload_credentials
+
 python_executable = sys.executable
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -14,22 +19,46 @@ EXTRACT_DIR = os.path.join(BASE_DIR, "input_data")
 # STEP 0 — FIND INPUT FILES
 # -----------------------------------
 
-zip_path = None
-excel_path = None
+os.makedirs(ASSETS_DIR, exist_ok=True)
 
-for file in os.listdir(ASSETS_DIR):
-    file_path = os.path.join(ASSETS_DIR, file)
+use_drive_inputs = (
+    os.environ.get("GDRIVE_ZIP_ROOT_FOLDER_ID")
+    and os.environ.get("GDRIVE_XLS_ROOT_FOLDER_ID")
+    and has_drive_credentials()
+)
 
-    if file.lower().endswith(".zip"):
-        zip_path = file_path
+if use_drive_inputs:
+    for item in os.listdir(ASSETS_DIR):
+        item_path = os.path.join(ASSETS_DIR, item)
+        if os.path.isdir(item_path):
+            shutil.rmtree(item_path)
+        else:
+            os.remove(item_path)
 
-    elif file.lower().endswith(".xls"):
-        excel_path = file_path
+    zip_path, excel_path = download_inputs_from_drive(ASSETS_DIR)
+else:
+    if (
+        os.environ.get("GDRIVE_ZIP_ROOT_FOLDER_ID")
+        and os.environ.get("GDRIVE_XLS_ROOT_FOLDER_ID")
+        and not has_drive_credentials()
+    ):
+        print("Using assets/ (Drive folders configured but credentials file not found)")
 
-if not zip_path:
-    raise Exception("No ZIP file found in assets/")
-if not excel_path:
-    raise Exception("No Excel (.xls) file found in assets/")
+    zip_path = None
+    excel_path = None
+
+    for file in os.listdir(ASSETS_DIR):
+        file_path = os.path.join(ASSETS_DIR, file)
+
+        if file.lower().endswith(".zip"):
+            zip_path = file_path
+        elif file.lower().endswith(".xls"):
+            excel_path = file_path
+
+    if not zip_path:
+        raise Exception("No ZIP file found in assets/")
+    if not excel_path:
+        raise Exception("No Excel (.xls) file found in assets/")
 
 print("ZIP found:", zip_path)
 print("Excel found:", excel_path)
@@ -76,7 +105,8 @@ if not delimit_path:
 
 subprocess.run(
     [python_executable, "run_pipeline.py", delimit_path],
-    check=True
+    check=True,
+    cwd=BASE_DIR,
 )
 
 # -----------------------------------
@@ -85,7 +115,8 @@ subprocess.run(
 
 subprocess.run(
     [python_executable, "validate.py", excel_path],
-    check=True
+    check=True,
+    cwd=BASE_DIR,
 )
 
 # -----------------------------------
@@ -99,14 +130,14 @@ with open(dump_path, "w") as f:
         [
             "mysqldump",
             "--no-tablespaces",
-            "-h", "127.0.0.1",
-            "-P", "3306",
-            "-u", "root",
-            "-proot",
-            "medispan_test"
+            "-h", MYSQL_HOST,
+            "-P", str(MYSQL_PORT),
+            "-u", MYSQL_USER,
+            f"-p{MYSQL_PASSWORD}",
+            MYSQL_DATABASE,
         ],
-        stdout=f,                 
-        stderr=subprocess.PIPE,   
+        stdout=f,
+        stderr=subprocess.PIPE,
         text=True
     )
 
@@ -116,3 +147,24 @@ if result.returncode != 0:
     raise Exception("mysqldump failed")
 
 print("Dump saved at:", dump_path)
+
+# -----------------------------------
+# STEP 7 — UPLOAD TO GOOGLE DRIVE
+# -----------------------------------
+
+if os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID") and has_upload_credentials():
+    subprocess.run(
+        [python_executable, "upload_to_drive.py", dump_path],
+        check=True,
+        cwd=BASE_DIR,
+    )
+elif os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID"):
+    print(
+        "\nSQL dump saved locally, but Drive upload was skipped.\n"
+        "One-time fix:\n"
+        "  1. Save OAuth Desktop client JSON as oauth-client.json\n"
+        "  2. Run: python authorize_drive.py\n"
+        "  3. Run: python main.py again\n"
+    )
+else:
+    print("Skipping Google Drive upload (GDRIVE_SQL_ROOT_FOLDER_ID not set)")

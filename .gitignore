@@ -1,2 +1,6 @@
 .venv/
 venv/
+.env
+gdrive-credentials.json
+oauth-client.json
+google-oauth-token.json
