@@ -11,7 +11,7 @@ CHANGE_TYPE_TO_DB = {
     "NDC": ("mf2ndc_h", "NDC_UPC_HRI"),
     "DDID Code": ("mf2ndc_h", "Drug_Descriptor_Identifier"),
     "Multi-Source Code": ("mf2ndc_h", "Multi_Source_Code"),
-    "SUM": ("mf2name_f", "Multi_Source_Summary_Code"),
+    "SUM": ("mf2gppc_j", "Package_Size_Unit_of_Measure"),
     "Labeler Code": ("mf2ndc_h", "Medi_Span_Labeler_Identifier"),
     "GPPC Code": ("mf2ndc_h", "Generic_Product_Packaging_Code"),
     "TEE Code": ("mf2ndc_h", "TEE_Code"),
