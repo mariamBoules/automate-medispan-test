@@ -1,11 +1,20 @@
 import os
+import sys
 import zipfile
 import subprocess
 import shutil
 
 import env_loader  # noqa: F401 — loads .env before reading variables
 
-from db_config import MYSQL_DATABASE, MYSQL_HOST, MYSQL_PASSWORD, MYSQL_PORT, MYSQL_USER
+from db_config import (
+    MYSQL_DATABASE,
+    MYSQL_HOST,
+    MYSQL_PASSWORD,
+    MYSQL_PORT,
+    MYSQL_USER,
+)
+from deploy_config import describe_deploy_plan, resolve_deploy_plan
+from deploy_database import deploy as deploy_database
 from drive_utils import download_inputs_from_drive, has_drive_credentials, has_upload_credentials, upload_sql_to_drive
 from run_pipeline import run as run_pipeline
 from validate import main as run_validation
@@ -140,11 +149,16 @@ if result.returncode != 0:
 print("Dump saved at:", dump_path)
 
 # -----------------------------------
-# STEP 7 — UPLOAD TO GOOGLE DRIVE
+# STEP 7 — PUBLISH (Google Drive + target schema)
 # -----------------------------------
 
+publish_errors = []
+
 if os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID") and has_upload_credentials():
-    upload_sql_to_drive(dump_path)
+    try:
+        upload_sql_to_drive(dump_path)
+    except Exception as exc:
+        publish_errors.append(f"Google Drive upload failed: {exc}")
 elif os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID"):
     print(
         "\nSQL dump saved locally, but Drive upload was skipped.\n"
@@ -155,3 +169,20 @@ elif os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID"):
     )
 else:
     print("Skipping Google Drive upload (GDRIVE_SQL_ROOT_FOLDER_ID not set)")
+
+deploy_plan = resolve_deploy_plan()
+print(describe_deploy_plan(deploy_plan))
+
+if deploy_plan.enabled and deploy_plan.database:
+    try:
+        deploy_database(dump_path, deploy_plan.database)
+        print(f"Deploy complete ({deploy_plan.label})")
+    except Exception as exc:
+        publish_errors.append(f"Database deploy failed: {exc}")
+elif deploy_plan.skip_reason:
+    print(deploy_plan.skip_reason)
+
+if publish_errors:
+    for message in publish_errors:
+        print(message, file=sys.stderr)
+    raise SystemExit(1)

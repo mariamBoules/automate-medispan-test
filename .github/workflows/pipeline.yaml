@@ -20,6 +20,11 @@ jobs:
       MYSQL_USER: root
       MYSQL_PASSWORD: root
       MYSQL_DATABASE: medispan_test
+      # Exercises production deploy path (mocked → mock-rxmax) on CI MySQL.
+      DEPLOY_TARGET: production
+      DEPLOY_ALLOW_PRODUCTION: "false"
+      DEPLOY_MOCK_DATABASE: mock-rxmax
+      DEPLOY_SKIP_ON_CI: "false"
 
     services:
       mysql:
@@ -45,6 +50,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Install MySQL client
+        run: sudo apt-get update && sudo apt-get install -y default-mysql-client
+
       - name: Wait for MySQL
         run: sleep 20
 
@@ -61,8 +69,18 @@ jobs:
           PIPELINE_MONTH: ${{ github.event.inputs.month }}
         run: python main.py
 
+      - name: Verify database deploy (CI smoke test)
+        run: python verify_ci_deploy.py
+
       - name: Upload SQL output
         uses: actions/upload-artifact@v4
         with:
           name: medispan-output
           path: medispan_dump.sql
+
+      - name: Sync local mock schema (run on your PC)
+        if: success()
+        run: |
+          echo "Remote pipeline finished. SQL is on Google Drive."
+          echo "On your machine (with local MySQL + Workbench), run:"
+          echo "  python sync_mock_from_drive.py"

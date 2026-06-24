@@ -279,3 +279,22 @@ def upload_sql_to_drive(file_path):
     link = result.get("webViewLink") or f"https://drive.google.com/file/d/{result['id']}/view"
     print(f"Uploaded SQL to Drive ({year}/{month:02d}): {link}")
     return result
+
+
+def download_latest_sql_from_drive(dest_path):
+    """Download the newest .sql file from the pipeline month folder on Drive."""
+    sql_root = os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID")
+    if not sql_root:
+        raise RuntimeError("GDRIVE_SQL_ROOT_FOLDER_ID is not set.")
+
+    service = get_service()
+    year, month = get_pipeline_year_month()
+    folder_id = ensure_year_month_folder(service, sql_root, year, month)
+    sql_file = find_latest_file(service, folder_id, ["sql"])
+
+    download_file(service, sql_file["id"], dest_path)
+    print(
+        f"Downloaded SQL from Drive ({year}/{month:02d}): "
+        f"{sql_file['name']} (modified {sql_file.get('modifiedTime', '?')})"
+    )
+    return sql_file
