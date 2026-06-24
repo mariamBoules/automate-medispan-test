@@ -3,6 +3,7 @@ import env_loader  # noqa: F401 — loads .env before reading variables
 import io
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -120,7 +121,7 @@ def list_children(service, parent_id, mime_type=None):
             service.files()
             .list(
                 q=query,
-                fields="nextPageToken, files(id, name, mimeType, modifiedTime)",
+                fields="nextPageToken, files(id, name, mimeType, modifiedTime, size)",
                 pageToken=page_token,
                 supportsAllDrives=True,
                 includeItemsFromAllDrives=True,
@@ -176,35 +177,124 @@ def get_pipeline_year_month():
     return year, month
 
 
-def ensure_year_month_folder(service, root_id, year, month):
+def resolve_year_month_folder(service, root_id, year, month, *, create=False):
     year_id = find_child_folder(service, root_id, str(year))
     if not year_id:
-        year_id = create_folder(service, root_id, str(year))
-        print(f"Created year folder: {year}")
+        if create:
+            year_id = create_folder(service, root_id, str(year))
+            print(f"Created year folder: {year}")
+        else:
+            raise FileNotFoundError(f"Year folder not found on Drive: {year}")
 
     month_id = find_child_folder_flexible(service, year_id, month_folder_candidates(month))
     if not month_id:
-        month_id = create_folder(service, year_id, f"{month:02d}")
-        print(f"Created month folder: {year}/{month:02d}")
+        if create:
+            month_id = create_folder(service, year_id, f"{month:02d}")
+            print(f"Created month folder: {year}/{month:02d}")
+        else:
+            raise FileNotFoundError(
+                f"Month folder not found on Drive: {year}/{month:02d} "
+                f"(looked for {', '.join(month_folder_candidates(month))})"
+            )
 
     return month_id
 
 
-def find_latest_file(service, folder_id, extensions):
+def ensure_year_month_folder(service, root_id, year, month):
+    return resolve_year_month_folder(service, root_id, year, month, create=True)
+
+
+# Google Drive folder downloads split large zips into parts like ...-3-001.zip
+DRIVE_SPLIT_ZIP_RE = re.compile(r"-\d+-\d{3}\.zip$", re.IGNORECASE)
+
+
+def is_incomplete_drive_zip(filename):
+    return bool(DRIVE_SPLIT_ZIP_RE.search(filename))
+
+
+def _list_folder_files(service, folder_id, extensions):
     normalized = {ext.lower().lstrip(".") for ext in extensions}
-    files = [
+    return [
         item
         for item in list_children(service, folder_id)
         if item.get("mimeType") != FOLDER_MIME
         and Path(item["name"]).suffix.lower().lstrip(".") in normalized
     ]
+
+
+def find_single_file_in_folder(service, folder_id, extensions, label):
+    """Require exactly one matching file in a Drive month folder."""
+    files = _list_folder_files(service, folder_id, extensions)
+
     if not files:
         raise FileNotFoundError(
-            f"No {', '.join(sorted(normalized))} file found in Drive folder {folder_id}"
+            f"No {label} file found in this Drive month folder "
+            f"(expected exactly one {', '.join(extensions)} file)."
         )
 
-    files.sort(key=lambda item: item.get("modifiedTime", ""), reverse=True)
-    return files[0]
+    if len(files) > 1:
+        names = ", ".join(item["name"] for item in files)
+        raise FileNotFoundError(
+            f"Expected exactly one {label} file in this Drive month folder, "
+            f"but found {len(files)}: {names}"
+        )
+
+    chosen = files[0]
+    if "zip" in {ext.lower().lstrip(".") for ext in extensions}:
+        if is_incomplete_drive_zip(chosen["name"]):
+            raise FileNotFoundError(
+                f"The only ZIP in this folder looks like a Google Drive split part "
+                f"({chosen['name']}). Upload one complete .zip file instead."
+            )
+
+    print(f"Using {label}: {chosen['name']}")
+    return chosen
+
+
+def find_single_local_file(directory, extensions, label):
+    """Require exactly one matching file in a local directory."""
+    normalized = {ext.lower().lstrip(".") for ext in extensions}
+    matches = [
+        name
+        for name in os.listdir(directory)
+        if Path(name).suffix.lower().lstrip(".") in normalized
+    ]
+
+    if not matches:
+        raise FileNotFoundError(
+            f"No {label} file found in {directory} "
+            f"(expected exactly one {', '.join(extensions)} file)."
+        )
+
+    if len(matches) > 1:
+        raise FileNotFoundError(
+            f"Expected exactly one {label} file in {directory}, "
+            f"but found {len(matches)}: {', '.join(matches)}"
+        )
+
+    path = os.path.join(directory, matches[0])
+    if "zip" in normalized and is_incomplete_drive_zip(matches[0]):
+        raise FileNotFoundError(
+            f"The only ZIP in assets/ looks like a Google Drive split part "
+            f"({matches[0]}). Use one complete .zip file instead."
+        )
+
+    return path
+
+
+def clear_folder_files(service, folder_id, extensions):
+    """Remove all matching files from a Drive folder before uploading new output."""
+    removed = []
+    for item in _list_folder_files(service, folder_id, extensions):
+        service.files().update(
+            fileId=item["id"],
+            body={"trashed": True},
+            supportsAllDrives=True,
+        ).execute()
+        removed.append(item["name"])
+
+    if removed:
+        print(f"Cleared {len(removed)} file(s) from output folder: {', '.join(removed)}")
 
 
 def download_file(service, file_id, dest_path):
@@ -219,9 +309,9 @@ def download_file(service, file_id, dest_path):
             _, done = downloader.next_chunk()
 
 
-def upload_file(service, file_path, folder_id):
+def upload_file(service, file_path, folder_id, drive_name=None):
     file_path = Path(file_path)
-    metadata = {"name": file_path.name, "parents": [folder_id]}
+    metadata = {"name": drive_name or file_path.name, "parents": [folder_id]}
     media = MediaFileUpload(str(file_path), resumable=True)
     return (
         service.files()
@@ -235,7 +325,7 @@ def upload_file(service, file_path, folder_id):
     )
 
 
-def download_inputs_from_drive(assets_dir):
+def download_inputs_from_drive(assets_dir, year, month):
     zip_root = os.environ.get("GDRIVE_ZIP_ROOT_FOLDER_ID")
     xls_root = os.environ.get("GDRIVE_XLS_ROOT_FOLDER_ID")
     if not zip_root or not xls_root:
@@ -244,14 +334,15 @@ def download_inputs_from_drive(assets_dir):
         )
 
     service = get_service()
-    year, month = get_pipeline_year_month()
     print(f"Using Drive year/month: {year}/{month:02d}")
 
-    zip_folder_id = ensure_year_month_folder(service, zip_root, year, month)
-    xls_folder_id = ensure_year_month_folder(service, xls_root, year, month)
+    zip_folder_id = resolve_year_month_folder(service, zip_root, year, month, create=False)
+    xls_folder_id = resolve_year_month_folder(service, xls_root, year, month, create=False)
 
-    zip_file = find_latest_file(service, zip_folder_id, ["zip"])
-    xls_file = find_latest_file(service, xls_folder_id, ["xls", "xlsx"])
+    zip_file = find_single_file_in_folder(service, zip_folder_id, ["zip"], "ZIP")
+    xls_file = find_single_file_in_folder(
+        service, xls_folder_id, ["xls", "xlsx"], "XLS"
+    )
 
     assets_path = Path(assets_dir)
     assets_path.mkdir(parents=True, exist_ok=True)
@@ -267,30 +358,29 @@ def download_inputs_from_drive(assets_dir):
     return str(zip_dest), str(xls_dest)
 
 
-def upload_sql_to_drive(file_path):
+def upload_sql_to_drive(file_path, year, month):
     sql_root = os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID")
     if not sql_root:
         raise RuntimeError("GDRIVE_SQL_ROOT_FOLDER_ID is not set.")
 
     service = get_upload_service()
-    year, month = get_pipeline_year_month()
     folder_id = ensure_year_month_folder(service, sql_root, year, month)
+    clear_folder_files(service, folder_id, ["sql"])
     result = upload_file(service, file_path, folder_id)
     link = result.get("webViewLink") or f"https://drive.google.com/file/d/{result['id']}/view"
     print(f"Uploaded SQL to Drive ({year}/{month:02d}): {link}")
     return result
 
 
-def download_latest_sql_from_drive(dest_path):
-    """Download the newest .sql file from the pipeline month folder on Drive."""
+def download_latest_sql_from_drive(dest_path, year, month):
+    """Download the only .sql file from a specific year/month folder on Drive."""
     sql_root = os.environ.get("GDRIVE_SQL_ROOT_FOLDER_ID")
     if not sql_root:
         raise RuntimeError("GDRIVE_SQL_ROOT_FOLDER_ID is not set.")
 
     service = get_service()
-    year, month = get_pipeline_year_month()
-    folder_id = ensure_year_month_folder(service, sql_root, year, month)
-    sql_file = find_latest_file(service, folder_id, ["sql"])
+    folder_id = resolve_year_month_folder(service, sql_root, year, month, create=False)
+    sql_file = find_single_file_in_folder(service, folder_id, ["sql"], "SQL")
 
     download_file(service, sql_file["id"], dest_path)
     print(

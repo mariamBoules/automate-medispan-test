@@ -7,6 +7,7 @@ google-oauth-token.json
 __pycache__/
 *.pyc
 medispan_dump.sql
+medispan_dump_*.sql
 validation_errors.csv
 input_data/
 assets/*.zip

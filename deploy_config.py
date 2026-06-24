@@ -76,7 +76,7 @@ def resolve_deploy_plan() -> DeployPlan:
             target,
             False,
             "Deploy skipped on CI (runner MySQL is temporary). "
-            "After the workflow finishes, run on your PC: python sync_mock_from_drive.py",
+            "After the workflow finishes, run on your PC: python sync_mock_from_drive.py YEAR MONTH",
         )
 
     if target == "mock":

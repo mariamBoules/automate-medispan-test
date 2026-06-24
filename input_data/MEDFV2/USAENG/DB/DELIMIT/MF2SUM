@@ -1,14 +1,14 @@
 CCR||010||| Copyright 2026 UpToDate, Inc. All Rights Reserved.
 CDC||010||*| Create Date
-CDC||020||| 20260528
+CDC||020||| 20260326
 CDE||010||*| Expiration Date
-CDE||020||| 20260701
+CDE||020||| 20260506
 CDI||010||*| Issue Date
-CDI||020||| 20260603
+CDI||020||| 20260401
 CDJ||010||*| Grace Message Date
-CDJ||020||| 20260701
+CDJ||020||| 20260506
 CDK||010||*| Kill Date
-CDK||020||| 20260801
+CDK||020||| 20260606
 CFM||010||*| Product File Mode (P-Production, T-Test)
 CFM||020||| P
 CFT||010||*| Product File Type (T-Total, U-Update)
@@ -22,13 +22,13 @@ CPV||020||*| YY.Q.F.NNN Year, Quarter Number, Frequency, Publication Number
 CPV||030||*|    Q = 1,2,3,4, F = Blank (Qtrly), 1 Monthly,
 CPV||040||*|    2 Semi-Monthly,
 CPV||050||*|    3 Weekly, 4 Daily
-CPV||060||| 26.2.1.003
+CPV||060||| 26.2.1.001
 CVL||010||*|
 CVL||015||*| Volume Number
 CVL||020||*| Vol   Supplement
 CVL||022||*| No.   No.
 CVL||025||*| ----- --
-CVL||030||| 00186 00
+CVL||030||| 00184 00
 LCC||010||*|
 LCC||020||*| Country Code and Country
 LCC||030||*|   (01 USA, 02 Canada, 03 Mexico)
@@ -51,13 +51,13 @@ TOC||120||| 01 020 MF2SUM       0000063
 TOC||130||| 01 030 MF2READ      0000002
 TOC||140||| 01 040 MF2DICT      0000146
 TOC||150||| 01 050 MF2VAL       0000545
-TOC||160||| 01 060 MF2NAME      0053409
-TOC||170||| 01 070 MF2TCGPI     0039330
-TOC||180||| 01 080 MF2NDC       0184566
-TOC||190||| 01 090 MF2LAB       0002363
-TOC||200||| 01 100 MF2GPPC      0053796
-TOC||210||| 01 120 MF2GPR       0026846
-TOC||220||| 01 130 MF2PRC       0389262
-TOC||230||| 01 140 MF2MOD       0004038
-TOC||240||| 01 150 MF2NDCM      0312801
-TOC||250||| 01 160 MF2SEC       0008195
+TOC||160||| 01 060 MF2NAME      0053261
+TOC||170||| 01 070 MF2TCGPI     0039260
+TOC||180||| 01 080 MF2NDC       0183855
+TOC||190||| 01 090 MF2LAB       0002355
+TOC||200||| 01 100 MF2GPPC      0053660
+TOC||210||| 01 120 MF2GPR       0016563
+TOC||220||| 01 130 MF2PRC       0387931
+TOC||230||| 01 140 MF2MOD       0004025
+TOC||240||| 01 150 MF2NDCM      0310603
+TOC||250||| 01 160 MF2SEC       0008200

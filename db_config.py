@@ -18,6 +18,9 @@ MYSQL_USER = _require("MYSQL_USER")
 MYSQL_PASSWORD = _require("MYSQL_PASSWORD")
 MYSQL_DATABASE = _require("MYSQL_DATABASE")
 
+# Database rebuilt from delimit files on every pipeline run.
+PIPELINE_DATABASE = os.environ.get("PIPELINE_DATABASE", MYSQL_DATABASE).strip() or MYSQL_DATABASE
+
 
 def connect(**kwargs):
     import mysql.connector

@@ -1,13 +1,12 @@
 import os
-import pandas as pd
 import sys
 
-from db_config import MYSQL_DATABASE, connect
+import pandas as pd
+
+from db_config import PIPELINE_DATABASE, connect
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-
-# CHANGE TYPE in Excel -> (table, column)
 CHANGE_TYPE_TO_DB = {
     "NDC": ("mf2ndc_h", "NDC_UPC_HRI"),
     "DDID Code": ("mf2ndc_h", "Drug_Descriptor_Identifier"),
@@ -15,6 +14,9 @@ CHANGE_TYPE_TO_DB = {
     "Labeler Code": ("mf2ndc_h", "Medi_Span_Labeler_Identifier"),
     "GPPC Code": ("mf2ndc_h", "Generic_Product_Packaging_Code"),
     "TEE Code": ("mf2ndc_h", "TEE_Code"),
+    "DESI Code": ("mf2ndc_h", "DESI_Code"),
+    "Third Party Code": ("mf2ndc_h", "Third_Party_Restriction_Code"),
+    "Brand Name Code": ("mf2ndc_h", "Name_Type_Code"),
     "PRODUCT NAME": ("mf2name_f", "Drug_Name"),
     "Dosage Form": ("mf2name_f", "Dosage_Form"),
     "Strength": ("mf2name_f", "Strength"),
@@ -31,17 +33,33 @@ def normalize(value):
         return ""
 
     value = str(value).strip()
-
-    # treat NA as empty
     if value.upper() in ["NA", "N/A"]:
         return ""
 
     return value
 
+
+def normalize_ndc(value):
+    value = normalize(value)
+    if not value:
+        return ""
+    if value.endswith(".0") and value[:-2].isdigit():
+        return value[:-2]
+    return value
+
+
+def ndc_lookup_candidates(ndc):
+    ndc = normalize_ndc(ndc)
+    if not ndc:
+        return []
+
+    candidates = [ndc]
+    if ndc.isdigit():
+        candidates.append(ndc.zfill(11))
+    return list(dict.fromkeys(candidates))
+
+
 def get_db_value(cursor, ndc, table_name, column_name):
-    """
-    Fetch the current DB value for one NDC and one target column.
-    """
     if table_name == "mf2ndc_h":
         query = f"""
             SELECT {column_name} AS value
@@ -49,9 +67,12 @@ def get_db_value(cursor, ndc, table_name, column_name):
             WHERE NDC_UPC_HRI = %s
             LIMIT 1
         """
-        cursor.execute(query, (ndc,))
-        row = cursor.fetchone()
-        return row["value"] if row else None
+        for candidate in ndc_lookup_candidates(ndc):
+            cursor.execute(query, (candidate,))
+            row = cursor.fetchone()
+            if row:
+                return row["value"]
+        return None
 
     if table_name == "mf2name_f":
         query = f"""
@@ -62,11 +83,7 @@ def get_db_value(cursor, ndc, table_name, column_name):
             WHERE n.NDC_UPC_HRI = %s
             LIMIT 1
         """
-        cursor.execute(query, (ndc,))
-        row = cursor.fetchone()
-        return row["value"] if row else None
-
-    if table_name == "mf2lab_i":
+    elif table_name == "mf2lab_i":
         query = f"""
             SELECT l.{column_name} AS value
             FROM mf2ndc_h n
@@ -75,11 +92,7 @@ def get_db_value(cursor, ndc, table_name, column_name):
             WHERE n.NDC_UPC_HRI = %s
             LIMIT 1
         """
-        cursor.execute(query, (ndc,))
-        row = cursor.fetchone()
-        return row["value"] if row else None
-
-    if table_name == "mf2gppc_j":
+    elif table_name == "mf2gppc_j":
         query = f"""
             SELECT g.{column_name} AS value
             FROM mf2ndc_h n
@@ -88,45 +101,50 @@ def get_db_value(cursor, ndc, table_name, column_name):
             WHERE n.NDC_UPC_HRI = %s
             LIMIT 1
         """
-        cursor.execute(query, (ndc,))
-        row = cursor.fetchone()
-        return row["value"] if row else None
+    else:
+        raise ValueError(f"Unsupported table: {table_name}")
 
-    raise ValueError(f"Unsupported table: {table_name}")
+    for candidate in ndc_lookup_candidates(ndc):
+        cursor.execute(query, (candidate,))
+        row = cursor.fetchone()
+        if row:
+            return row["value"]
+    return None
 
 
 def main(excel_path):
-    conn = connect(database=MYSQL_DATABASE)
+    conn = connect(database=PIPELINE_DATABASE)
     cursor = conn.cursor(dictionary=True)
 
     df = pd.read_excel(excel_path, engine="xlrd")
-
-    # Adjust these if the actual sheet uses slightly different names
-    NDC_COL = "NDC"
-    CHANGE_TYPE_COL = "CHANGE TYPE"
-    NEW_VAL_COL = "NEW VAL"
+    df.columns = [str(col).strip() for col in df.columns]
 
     errors = []
     skipped = []
+    unmapped = []
+    validated_count = 0
+    found_in_db_count = 0
 
     for idx, row in df.iterrows():
-        ndc = normalize(row.get(NDC_COL))
-        change_type = normalize(row.get(CHANGE_TYPE_COL))
-        expected_new_val = normalize(row.get(NEW_VAL_COL))
+        ndc = normalize_ndc(row.get("NDC"))
+        change_type = normalize(row.get("CHANGE TYPE"))
+        expected_new_val = normalize(row.get("NEW VAL"))
 
         if not ndc or not change_type:
             skipped.append((idx, "Missing NDC or CHANGE TYPE"))
             continue
 
         if change_type not in CHANGE_TYPE_TO_DB:
-            skipped.append((idx, ndc, change_type, "CHANGE TYPE not mapped"))
+            unmapped.append((idx, ndc, change_type))
             continue
 
         table_name, column_name = CHANGE_TYPE_TO_DB[change_type]
-
         actual_db_val = get_db_value(cursor, ndc, table_name, column_name)
-        actual_db_val = normalize(actual_db_val)
+        validated_count += 1
+        if actual_db_val is not None:
+            found_in_db_count += 1
 
+        actual_db_val = normalize(actual_db_val)
         if actual_db_val != expected_new_val:
             errors.append({
                 "row_index": idx,
@@ -137,28 +155,49 @@ def main(excel_path):
                 "actual_db_val": actual_db_val,
             })
 
-
     cursor.close()
     conn.close()
 
     if skipped:
+        print("Skipped rows (sample):")
         for item in skipped[:10]:
             print(item)
 
-    if errors:
-        # convert to DataFrame
-        errors_df = pd.DataFrame(errors)
+    if unmapped:
+        unmapped_types = sorted({change_type for _, _, change_type in unmapped})
+        print(f"Unmapped CHANGE TYPE rows: {len(unmapped)} ({', '.join(unmapped_types)})")
+        for item in unmapped[:10]:
+            print(item)
 
-        # save file
-        output_path = os.path.join(BASE_DIR, "validation_errors.csv")
-        errors_df.to_csv(output_path, index=False)
-
-        print(f"Errors saved to: {output_path}")
-
+        print(
+            "\nVALIDATION FAILED: one or more rows use a CHANGE TYPE that is not mapped. "
+            "Add the mapping in validate.py or fix the Excel file."
+        )
         raise SystemExit(1)
 
-    else:
-        print("\nVALIDATION PASSED")
+    if validated_count == 0:
+        print(
+            "\nVALIDATION FAILED: no rows could be checked "
+            "(Excel empty or every row missing NDC/CHANGE TYPE)."
+        )
+        raise SystemExit(1)
+
+    if found_in_db_count == 0:
+        print(
+            "\nVALIDATION FAILED: none of the Excel change rows could be found in the database."
+        )
+        raise SystemExit(1)
+
+    if errors:
+        errors_df = pd.DataFrame(errors)
+        output_path = os.path.join(BASE_DIR, "validation_errors.csv")
+        errors_df.to_csv(output_path, index=False)
+        print(f"Errors saved to: {output_path}")
+        raise SystemExit(1)
+
+    print(
+        f"\nVALIDATION PASSED ({validated_count} row(s) checked against `{PIPELINE_DATABASE}`)"
+    )
 
 
 if __name__ == "__main__":

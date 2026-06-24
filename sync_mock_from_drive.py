@@ -1,12 +1,8 @@
 """
-Pull the latest medispan_dump.sql from Google Drive and deploy it to the local
+Pull the SQL dump from a Google Drive year/month folder and deploy it to the local
 mock schema (mock-rxmax by default).
 
-Use this after a GitHub Actions run so remote pipeline output shows up in your
-local MySQL Workbench without giving CI access to your laptop.
-
-  python sync_mock_from_drive.py
-  python sync_mock_from_drive.py --year 2026 --month 6
+  python sync_mock_from_drive.py 2026 5
 """
 
 import argparse
@@ -18,25 +14,18 @@ import env_loader  # noqa: F401
 from deploy_config import mock_database_name
 from deploy_database import deploy
 from drive_utils import download_latest_sql_from_drive, has_drive_credentials
+from pipeline_period import SQL_DUMP_FILENAME
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_DUMP_PATH = os.path.join(BASE_DIR, "medispan_dump.sql")
+DEFAULT_DUMP_PATH = os.path.join(BASE_DIR, SQL_DUMP_FILENAME)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Download latest SQL from Drive and deploy to local mock schema.",
+        description="Download SQL from a Drive year/month folder and deploy to local mock schema.",
     )
-    parser.add_argument(
-        "--year",
-        type=int,
-        help="Drive year folder (default: PIPELINE_YEAR or current year)",
-    )
-    parser.add_argument(
-        "--month",
-        type=int,
-        help="Drive month folder (default: PIPELINE_MONTH or current month)",
-    )
+    parser.add_argument("year", type=int, help="Drive year folder (e.g. 2026)")
+    parser.add_argument("month", type=int, help="Drive month 1-12 (e.g. 5 for May)")
     parser.add_argument(
         "--dump-path",
         default=DEFAULT_DUMP_PATH,
@@ -44,10 +33,8 @@ def main():
     )
     args = parser.parse_args()
 
-    if args.year is not None:
-        os.environ["PIPELINE_YEAR"] = str(args.year)
-    if args.month is not None:
-        os.environ["PIPELINE_MONTH"] = str(args.month)
+    if not 1 <= args.month <= 12:
+        parser.error("month must be between 1 and 12")
 
     if not has_drive_credentials():
         print(
@@ -58,11 +45,17 @@ def main():
         raise SystemExit(1)
 
     database = mock_database_name()
-    print(f"Sync target: local mock schema `{database}` (from Drive → local MySQL)")
+    print(
+        f"Sync target: `{database}` on local MySQL "
+        f"← Drive SQL folder {args.year}/{args.month:02d}"
+    )
 
-    download_latest_sql_from_drive(args.dump_path)
+    download_latest_sql_from_drive(args.dump_path, args.year, args.month)
     deploy(args.dump_path, database)
-    print(f"\nLocal mock schema `{database}` is now in sync with the latest remote pipeline output.")
+    print(
+        f"\nLocal mock schema `{database}` is now in sync with "
+        f"Drive {args.year}/{args.month:02d} pipeline output."
+    )
 
 
 if __name__ == "__main__":

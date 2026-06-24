@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       year:
-        description: "Year folder (default: current year)"
-        required: false
+        description: "Year folder (e.g. 2026)"
+        required: true
       month:
-        description: "Month folder 1-12 (default: current month)"
-        required: false
+        description: "Month folder 1-12 (e.g. 4 for April)"
+        required: true
 
 jobs:
   run:
@@ -83,4 +83,5 @@ jobs:
         run: |
           echo "Remote pipeline finished. SQL is on Google Drive."
           echo "On your machine (with local MySQL + Workbench), run:"
-          echo "  python sync_mock_from_drive.py"
+          echo "  python sync_mock_from_drive.py YEAR MONTH"
+          echo "  e.g. python sync_mock_from_drive.py 2026 5"
