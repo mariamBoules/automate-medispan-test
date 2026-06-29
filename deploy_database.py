@@ -67,6 +67,42 @@ def ensure_database(cursor, database):
     )
 
 
+ARCHIVED_TABLE_RE = re.compile(r"^(?P<base>.+)_archived_\d{8}_\d{6}$")
+
+
+def list_stale_archived_tables(cursor, database):
+    cursor.execute(
+        """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = %s AND table_name LIKE %s
+        """,
+        (database, "%\\_archived\\_%"),
+    )
+    return [row[0] for row in cursor.fetchall() if ARCHIVED_TABLE_RE.match(row[0])]
+
+
+def cleanup_stale_archived_tables(cursor, database):
+    """
+    Remove or restore *_archived_* tables left by interrupted or failed deploys.
+
+    If the live table already exists, the stale archive is dropped. If only the
+    archive remains (deploy stopped after rename, before import), restore it.
+    """
+    cleaned = 0
+    cursor.execute(f"USE `{database}`")
+
+    for archived_name in list_stale_archived_tables(cursor, database):
+        original = ARCHIVED_TABLE_RE.match(archived_name).group("base")
+        if table_exists(cursor, database, original):
+            cursor.execute(f"DROP TABLE `{archived_name}`")
+        else:
+            cursor.execute(f"RENAME TABLE `{archived_name}` TO `{original}`")
+        cleaned += 1
+
+    return cleaned
+
+
 def archive_tables(cursor, database, tables, suffix):
     archived = {}
     cursor.execute(f"USE `{database}`")
@@ -289,6 +325,11 @@ def deploy(dump_path, target_database):
     try:
         ensure_database(cursor, target_database)
         conn.commit()
+
+        stale = cleanup_stale_archived_tables(cursor, target_database)
+        if stale:
+            conn.commit()
+            print(f"Cleaned up {stale} stale archived table(s) in `{target_database}`")
 
         archived = archive_tables(cursor, target_database, tables_to_archive, suffix)
         conn.commit()
