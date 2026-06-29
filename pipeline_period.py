@@ -55,14 +55,12 @@ def parse_period_args(argv: list[str] | None = None) -> tuple[int, int]:
     if os.environ.get("GITHUB_ACTIONS"):
         year_raw = os.environ.get("PIPELINE_YEAR", "").strip()
         month_raw = os.environ.get("PIPELINE_MONTH", "").strip()
-        if not year_raw or not month_raw:
-            print(
-                "GitHub Actions requires year and month workflow inputs "
-                "(e.g. year=2026, month=4).",
-                file=sys.stderr,
-            )
-            raise SystemExit(1)
-        return int(year_raw), validate_month(int(month_raw))
+        year = int(year_raw) if year_raw else None
+        month = int(month_raw) if month_raw else None
+        try:
+            return resolve_period(year, month)
+        except ValueError as exc:
+            parser.error(str(exc))
 
     try:
         return resolve_period(args.year, args.month)
